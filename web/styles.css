@@ -94,7 +94,9 @@ summary { cursor: pointer; font-weight: 600; }
 .events .t { font-variant-numeric: tabular-nums; font-weight: 600; width: 52px; }
 .events .l { flex: 1; }
 .events .src { font-size: 12px; color: var(--muted); }
-.events input[type=time] { width: 100px; }
+.events input[type=time] { width: 110px; }
+.events li.editing { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 10px; padding: 6px; }
+.events .icon-btn.ok { color: var(--green); font-size: 20px; font-weight: 700; }
 .icon-btn { background: none; border: 0; cursor: pointer; font-size: 16px; padding: 4px; color: var(--muted); }
 
 .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

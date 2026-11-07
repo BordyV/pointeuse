@@ -46,7 +46,11 @@ function parseHM(str) {
 
 // ---------- Rendu ----------
 
-function render() {
+// Pointage en cours de modification : tant qu'il est ouvert, on ne redessine pas
+// les listes (sinon le rafraîchissement du chrono, chaque seconde, ferme le champ).
+let editingId = null;
+
+function render(force = false) {
   const now = Date.now();
   const { events, settings } = db;
   const state = currentState(events);
@@ -84,17 +88,26 @@ function render() {
   $('#balance-text').textContent = balanceText(bal);
 
   // Pointages du jour
-  const todayEv = sortEvents(events).filter((e) => dayKey(e.ts) === dayKey(now));
-  $('#today-events').innerHTML = todayEv.length
-    ? todayEv.map(eventRow).join('')
-    : '<li class="muted">Aucun pointage aujourd’hui.</li>';
-
-  renderHistory(days);
+  if (!editingId || force) {
+    const todayEv = sortEvents(events).filter((e) => dayKey(e.ts) === dayKey(now));
+    $('#today-events').innerHTML = todayEv.length
+      ? todayEv.map(eventRow).join('')
+      : '<li class="muted">Aucun pointage aujourd’hui.</li>';
+    renderHistory(days);
+  }
   renderPlanning();
   renderGeoBadge();
 }
 
 function eventRow(e) {
+  if (e.id === editingId) {
+    return `<li data-id="${e.id}" class="editing">
+    <input type="time" class="edit-time" value="${fmtTime(e.ts)}" />
+    <span class="l">${LABELS[e.type]}</span>
+    <button class="icon-btn ok" data-save="${e.id}" title="Enregistrer">✓</button>
+    <button class="icon-btn" data-cancel="1" title="Annuler">✕</button>
+  </li>`;
+  }
   const src = e.source === 'geo' ? '📍 auto' : e.source === 'edit' ? '✏️ modifié' : '';
   return `<li data-id="${e.id}">
     <span class="t">${fmtTime(e.ts)}</span>
@@ -242,31 +255,45 @@ document.addEventListener('click', (ev) => {
     const e = db.events.find((x) => x.id === t.dataset.del);
     if (e && confirm(`Supprimer « ${LABELS[e.type]} » de ${fmtTime(e.ts)} ?`)) {
       db.events = db.events.filter((x) => x.id !== e.id);
+      editingId = null;
       save();
     }
     return;
   }
   if (t.dataset.edit) {
-    const e = db.events.find((x) => x.id === t.dataset.edit);
-    const li = t.closest('li');
-    const input = document.createElement('input');
-    input.type = 'time';
-    input.value = fmtTime(e.ts);
-    li.querySelector('.t').replaceWith(input);
-    input.focus();
-    const commit = () => {
-      const [h, m] = input.value.split(':').map(Number);
-      if (Number.isFinite(h)) {
-        const d = new Date(e.ts);
-        d.setHours(h, m, 0, 0);
-        e.ts = d.getTime();
-        e.source = 'edit';
-      }
-      save();
-    };
-    input.addEventListener('change', commit, { once: true });
-    input.addEventListener('blur', () => render(), { once: true });
+    editingId = t.dataset.edit;
+    render(true);
+    t.closest('section').querySelector(`li[data-id="${editingId}"] .edit-time`)?.focus();
+    return;
   }
+  if (t.dataset.save) return saveEdit(t.closest('li'));
+  if (t.dataset.cancel) {
+    editingId = null;
+    render(true);
+  }
+});
+
+function saveEdit(li) {
+  const e = db.events.find((x) => x.id === li.dataset.id);
+  const [h, m] = li.querySelector('.edit-time').value.split(':').map(Number);
+  editingId = null;
+  if (e && Number.isFinite(h) && Number.isFinite(m)) {
+    const d = new Date(e.ts);
+    d.setHours(h, m, 0, 0);
+    if (d.getTime() !== e.ts) {
+      e.ts = d.getTime();
+      e.source = 'edit';
+      toast(`${LABELS[e.type]} corrigé à ${fmtTime(e.ts)}`);
+    }
+  }
+  save();
+}
+
+// Entrée valide, Échap annule.
+document.addEventListener('keydown', (ev) => {
+  if (!ev.target.classList?.contains('edit-time')) return;
+  if (ev.key === 'Enter') saveEdit(ev.target.closest('li'));
+  if (ev.key === 'Escape') { editingId = null; render(true); }
 });
 
 $('#add-form').addEventListener('submit', (ev) => {
