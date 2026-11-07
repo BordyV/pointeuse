@@ -32,7 +32,7 @@ Puis ouvrir http://localhost:8080/web/.
 node scripts/build-web.mjs
 ```
 
-Le contenu de `dist/` s'héberge tel quel en HTTPS (GitHub Pages par exemple).
+Publication sur GitHub Pages : `sh scripts/deploy-web.sh` (construit `dist/` et le pousse sur la branche `gh-pages`).
 Le HTTPS est obligatoire pour le GPS et l'installation. Sur le téléphone :
 ouvrir le lien, puis « Ajouter à l'écran d'accueil » (Safari : bouton Partager ;
 Chrome : menu ⋮ → Installer). L'app s'ouvre alors en plein écran et marche hors connexion.
