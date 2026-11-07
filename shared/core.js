@@ -192,8 +192,36 @@ export function todayForecast(days, settings, events, now = Date.now(), planning
   const expected = expectedFor(key, settings, planning);
   const remaining = expected - worked;
   const state = currentState(events);
-  const endAt = state === 'working' && remaining > 0 ? now + remaining * 60000 : null;
-  return { worked, expected, remaining, endAt, pause: today?.pause || 0, plan: planning[key] || null };
+  const plan = planning[key] || null;
+  // En pause, c'est l'heure de fin « si tu reprends maintenant ».
+  const endAt = state !== 'off' && remaining > 0 ? estimateEnd(now, remaining, plan) : null;
+  const slots = plan?.status === 'work' ? plan.slots : [];
+  return {
+    worked, expected, remaining, endAt, state, plan,
+    pause: today?.pause || 0,
+    progress: expected > 0 ? Math.min(1, worked / expected) : 0,
+    started: worked > 0 || state !== 'off',
+    plannedEnd: slots.length ? Math.max(...slots.map(([, b]) => toMin(b))) : null,
+  };
+}
+
+// Heure de fin estimée : le temps restant à partir de maintenant, en sautant
+// les coupures du planning encore à venir (ex. 12:00–13:30 entre deux créneaux).
+function estimateEnd(now, remaining, plan) {
+  const d = new Date(now);
+  const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  let cur = (now - midnight) / 60000;
+  let left = remaining;
+  const slots = plan?.status === 'work' ? [...plan.slots].sort((a, b) => toMin(a[0]) - toMin(b[0])) : [];
+  for (let i = 1; i < slots.length; i++) {
+    const a = toMin(slots[i - 1][1]);
+    const b = toMin(slots[i][0]);
+    if (b <= a || a < cur) continue; // coupure passée ou déjà entamée
+    if (cur + left <= a) break; // tu auras fini avant la coupure
+    left -= a - cur;
+    cur = b;
+  }
+  return midnight + (cur + left) * 60000;
 }
 
 // ---------- Formatage ----------

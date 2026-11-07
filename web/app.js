@@ -64,10 +64,24 @@ function render(force = false) {
   $('#timer').textContent = fmtDur(fc.worked);
   let f = '';
   if (fc.expected > 0) {
-    f = fc.remaining > 0
-      ? `Reste ${fmtDur(fc.remaining)} sur ${fmtDur(fc.expected)}`
-      : `Objectif atteint · <span class="pos">${fmtDur(-fc.remaining, true)}</span>`;
-    if (fc.endAt) f += ` · sortie prévue à <strong>${fmtTime(fc.endAt)}</strong>`;
+    const bar = `<div class="progress"><span style="width:${Math.round(fc.progress * 100)}%"></span></div>`;
+    if (fc.remaining <= 0) {
+      f = `<div class="countdown done">Journée faite ✓</div>
+        <div><span class="pos">${fmtDur(-fc.remaining, true)}</span> par rapport aux ${fmtDur(fc.expected)} prévues</div>`;
+    } else if (!fc.started) {
+      f = `<div class="countdown">${fmtDur(fc.remaining)} <small>à faire aujourd’hui</small></div>`;
+      if (fc.plannedEnd != null) f += `<div>fin prévue à <strong>${fmtDur(fc.plannedEnd)}</strong></div>`;
+    } else if (state === 'working') {
+      f = `<div class="countdown">encore ${fmtDur(fc.remaining)}</div>
+        <div>fin de journée vers <strong>${fmtTime(fc.endAt)}</strong></div>`;
+    } else if (state === 'paused') {
+      f = `<div class="countdown paused">encore ${fmtDur(fc.remaining)} <small>(en pause)</small></div>
+        <div>fin vers <strong>${fmtTime(fc.endAt)}</strong> si tu reprends maintenant</div>`;
+    } else {
+      f = `<div class="countdown">il manque ${fmtDur(fc.remaining)}</div>
+        <div class="muted">sur les ${fmtDur(fc.expected)} prévues aujourd’hui</div>`;
+    }
+    f = bar + f;
   } else if (fc.worked > 0) f = 'Jour non travaillé : tout compte en heures sup';
   if (fc.pause > 0) f += `<br><span class="muted">Pause : ${fmtDur(fc.pause)}</span>`;
   $('#forecast').innerHTML = f;

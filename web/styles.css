@@ -57,7 +57,13 @@ summary { cursor: pointer; font-weight: 600; }
 .state.working { color: var(--green); }
 .state.paused { color: var(--amber); }
 .timer { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
-.forecast { margin-top: 10px; font-size: 14px; }
+.forecast { margin-top: 12px; font-size: 14px; }
+.countdown { font-size: 22px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.countdown small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.countdown.paused { color: var(--amber); }
+.countdown.done { color: var(--green); }
+.progress { height: 8px; border-radius: 99px; background: var(--border); overflow: hidden; margin: 0 8px 12px; }
+.progress span { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .5s; }
 
 .actions { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
 .actions .btn:only-child { grid-column: span 2; }
