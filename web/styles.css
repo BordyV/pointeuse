@@ -145,6 +145,16 @@ label { display: block; font-size: 14px; color: var(--muted); }
 .tabs button span { font-size: 12px; }
 .tabs button.active { color: var(--accent); }
 
+.map-wrap { position: relative; margin: 8px 0; }
+.map { height: 300px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--bg); z-index: 0; }
+.map-msg { display: flex; align-items: center; justify-content: center; height: 100%; padding: 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.map-me {
+  position: absolute; right: 10px; bottom: 10px; z-index: 500;
+  width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer;
+  background: #fff; color: #2563eb; font-size: 22px; box-shadow: 0 1px 6px #0004;
+}
+input[type=range] { padding: 0; margin-top: 10px; accent-color: var(--accent); }
+
 .install-tip { position: relative; border-color: var(--accent); }
 .install-tip p { margin: 6px 0 10px; }
 .install-tip .close { position: absolute; top: 8px; right: 8px; }

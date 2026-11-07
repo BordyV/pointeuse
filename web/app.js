@@ -154,10 +154,12 @@ function renderSettings() {
   try { $('#api-key').value = localStorage.getItem(API_KEY) || ''; } catch {}
   $('#geo-enabled').checked = s.geo.enabled;
   $('#geo-radius').value = s.geo.radius;
+  $('#geo-radius-val').textContent = `${s.geo.radius} m`;
   $('#geo-delay').value = s.geo.delayMin;
   $('#geo-place').textContent = s.geo.lat != null
     ? `Lieu : ${s.geo.lat.toFixed(5)}, ${s.geo.lng.toFixed(5)}`
-    : 'Aucun lieu de travail défini.';
+    : 'Aucun lieu de travail défini : touche la carte pour le placer.';
+  initMap();
 }
 
 function renderGeoBadge() {
@@ -188,6 +190,7 @@ function onPosition(pos) {
   db.geoState = r.state;
   // On garde la position pour relancer le calcul du délai sans nouveau fix GPS.
   lastGeo = { ...r, pos };
+  showMe(pos);
   $('#geo-debug').textContent = r.distance != null
     ? `distance ${Math.round(r.distance)} m · précision ${Math.round(pos.accuracy || 0)} m · ${r.inside ? 'dedans' : 'dehors'}`
     : '';
@@ -330,6 +333,10 @@ $('#geo-enabled').addEventListener('change', async (ev) => {
   save();
   startGeo();
 });
+$('#geo-radius').addEventListener('input', (ev) => {
+  $('#geo-radius-val').textContent = `${ev.target.value} m`;
+  zone?.setRadius(Number(ev.target.value));
+});
 $('#geo-radius').addEventListener('change', (ev) => { db.settings.geo.radius = Number(ev.target.value) || 150; save(); });
 $('#geo-delay').addEventListener('change', (ev) => { db.settings.geo.delayMin = Math.max(0, Number(ev.target.value)); save(); });
 $('#geo-sim').addEventListener('change', startGeo);
@@ -339,11 +346,130 @@ $('#geo-set').addEventListener('click', () => {
   toast('Recherche de ta position…');
   navigator.geolocation.getCurrentPosition(
     (p) => {
-      Object.assign(db.settings.geo, { lat: p.coords.latitude, lng: p.coords.longitude });
-      save();
-      renderSettings();
-      startGeo();
+      setWorkplace(p.coords.latitude, p.coords.longitude);
+      fitZone();
       toast(`Lieu enregistré (précision ${Math.round(p.coords.accuracy)} m)`);
+    },
+    (err) => toast('GPS : ' + err.message),
+    { enableHighAccuracy: true, timeout: 20000 },
+  );
+});
+
+// ---------- Carte du lieu de travail ----------
+// Leaflet n'est chargé qu'à l'ouverture des réglages (et il faut du réseau pour les images).
+
+let map = null;
+let pin = null;
+let zone = null;
+let meDot = null;
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+  document.head.append(css);
+  return new Promise((resolve, reject) => {
+    const js = document.createElement('script');
+    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    js.onload = resolve;
+    js.onerror = reject;
+    document.head.append(js);
+  });
+}
+
+function setWorkplace(lat, lng) {
+  Object.assign(db.settings.geo, { lat, lng });
+  db.geoState = {};
+  save();
+  $('#geo-place').textContent = `Lieu : ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  placePin();
+  startGeo();
+}
+
+function placePin() {
+  const g = db.settings.geo;
+  if (!map) return;
+  if (g.lat == null) {
+    // Réglages effacés : on retire l'épingle.
+    pin?.remove();
+    zone?.remove();
+    pin = zone = null;
+    return;
+  }
+  if (!pin) {
+    pin = L.marker([g.lat, g.lng], { draggable: true, autoPan: true }).addTo(map);
+    pin.on('dragend', () => {
+      const { lat, lng } = pin.getLatLng();
+      setWorkplace(lat, lng);
+      toast('Lieu de travail déplacé');
+    });
+    zone = L.circle([g.lat, g.lng], { radius: g.radius, color: '#facc15', weight: 2, fillOpacity: 0.15 }).addTo(map);
+  } else {
+    pin.setLatLng([g.lat, g.lng]);
+    zone.setLatLng([g.lat, g.lng]).setRadius(g.radius);
+  }
+}
+
+// Cadre la carte sur toute la zone de pointage.
+const fitZone = () => zone && map.fitBounds(zone.getBounds(), { padding: [24, 24], maxZoom: 19 });
+
+function showMe(pos) {
+  if (!map || $('#geo-sim').checked) return;
+  const ll = [pos.lat, pos.lng];
+  if (!meDot) {
+    meDot = L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 })
+      .addTo(map).bindTooltip('Toi');
+  } else meDot.setLatLng(ll);
+}
+
+async function initMap() {
+  const el = $('#geo-map');
+  if (map) {
+    // La carte a été créée onglet caché : il faut lui redonner sa taille.
+    setTimeout(() => map.invalidateSize(), 0);
+    placePin();
+    return;
+  }
+  try {
+    await loadLeaflet();
+  } catch {
+    el.innerHTML = '<div class="map-msg">Carte indisponible hors connexion.</div>';
+    return;
+  }
+  if (map) return;
+  const g = db.settings.geo;
+  const has = g.lat != null;
+  map = L.map(el, { zoomControl: true }).setView(has ? [g.lat, g.lng] : [46.6, 2.4], has ? 18 : 5);
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, maxNativeZoom: 19, attribution: 'Images © Esri, Maxar, Earthstar Geographics',
+  });
+  const labels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 20, maxNativeZoom: 19,
+  });
+  const plan = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap',
+  });
+  const sat = L.layerGroup([satellite, labels]).addTo(map);
+  L.control.layers({ Satellite: sat, Plan: plan }, null, { position: 'topright' }).addTo(map);
+  map.on('click', (ev) => {
+    setWorkplace(ev.latlng.lat, ev.latlng.lng);
+    toast('Lieu de travail placé ici');
+  });
+  placePin();
+  if (lastGeo?.pos) showMe(lastGeo.pos);
+  setTimeout(() => { map.invalidateSize(); fitZone(); }, 0);
+}
+
+$('#map-me').addEventListener('click', () => {
+  if (!map) return;
+  if (lastGeo?.pos && !$('#geo-sim').checked) return map.setView([lastGeo.pos.lat, lastGeo.pos.lng], 18);
+  if (!('geolocation' in navigator)) return toast('Géolocalisation non disponible');
+  navigator.geolocation.getCurrentPosition(
+    (p) => {
+      const pos = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy };
+      showMe(pos);
+      map.setView([pos.lat, pos.lng], 18);
     },
     (err) => toast('GPS : ' + err.message),
     { enableHighAccuracy: true, timeout: 20000 },
