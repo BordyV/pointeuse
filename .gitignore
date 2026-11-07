@@ -1,0 +1,7 @@
+node_modules/
+dist/
+mobile/.expo/
+mobile/dist/
+mobile/android/
+mobile/ios/
+.claude/

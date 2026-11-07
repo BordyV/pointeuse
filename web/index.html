@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Pointeuse</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Pointeuse" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="app">
+    <section id="tab-pointer" class="tab active">
+      <header class="top">
+        <h1>Pointeuse</h1>
+        <span id="geo-badge" class="badge" hidden></span>
+      </header>
+
+      <div id="install-tip" class="card install-tip" hidden>
+        <button class="icon-btn close" id="install-close" title="Fermer">✕</button>
+        <strong>Installe la Pointeuse sur ton téléphone</strong>
+        <p id="install-text" class="small"></p>
+        <button id="install-btn" class="btn small" hidden>Installer</button>
+      </div>
+
+      <div class="card status">
+        <div id="state-label" class="state">Hors service</div>
+        <div id="timer" class="timer">0h00</div>
+        <div id="timer-sub" class="muted">travaillées aujourd’hui</div>
+        <div id="today-plan" class="plan-line"></div>
+        <div id="forecast" class="forecast"></div>
+      </div>
+
+      <div id="actions" class="actions"></div>
+
+      <div class="card balance" id="balance-card">
+        <div class="muted">Solde global</div>
+        <div id="balance" class="balance-value">+0h00</div>
+        <div id="balance-text"></div>
+      </div>
+
+      <div class="card">
+        <h2>Aujourd’hui</h2>
+        <ul id="today-events" class="events"></ul>
+      </div>
+    </section>
+
+    <section id="tab-history" class="tab">
+      <header class="top"><h1>Historique</h1></header>
+      <div class="card week" id="week-summary"></div>
+      <details class="card">
+        <summary>Ajouter un pointage oublié</summary>
+        <form id="add-form" class="add-form">
+          <input type="date" name="date" required />
+          <input type="time" name="time" required />
+          <select name="type">
+            <option value="in">Arrivée</option>
+            <option value="pause_start">Début de pause</option>
+            <option value="pause_end">Fin de pause</option>
+            <option value="out">Départ</option>
+          </select>
+          <button class="btn small">Ajouter</button>
+        </form>
+      </details>
+      <div id="history"></div>
+    </section>
+
+    <section id="tab-planning" class="tab">
+      <header class="top"><h1>Planning</h1></header>
+      <label class="btn file photo-btn">📷 Lire une photo du planning
+        <input id="plan-photo" type="file" accept="image/*" capture="environment" hidden />
+      </label>
+      <p id="plan-hint" class="muted small"></p>
+      <div id="plan-preview" class="card" hidden></div>
+      <div id="plan-weeks"></div>
+    </section>
+
+    <section id="tab-settings" class="tab">
+      <header class="top"><h1>Réglages</h1></header>
+
+      <div class="card">
+        <h2>Lecture du planning</h2>
+        <label>Ton nom tel qu’écrit sur le planning<input id="person" type="text" placeholder="PAROLA Hugo" /></label>
+        <label style="margin-top:10px">Clé API Anthropic<input id="api-key" type="password" placeholder="sk-ant-…" autocomplete="off" /></label>
+        <p class="muted small">La clé reste sur cet appareil (hors sauvegardes). La photo est envoyée à Claude pour être lue : elle contient aussi les horaires de tes collègues.</p>
+      </div>
+
+      <div class="card">
+        <h2>Horaires contractuels</h2>
+        <p class="muted">Heures attendues par jour. Total : <strong id="week-total"></strong></p>
+        <div id="schedule" class="schedule"></div>
+      </div>
+
+      <div class="card">
+        <h2>Ajustement du solde</h2>
+        <p class="muted">Heures sup payées, récup posée… Ex : <code>-3:30</code> pour retirer 3h30.</p>
+        <div class="row">
+          <input id="offset" type="text" inputmode="text" placeholder="0:00" />
+          <button id="offset-save" class="btn small">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Pointage automatique (GPS)</h2>
+        <label class="switch"><input type="checkbox" id="geo-enabled" /> Pointer l’arrivée automatiquement</label>
+        <p id="geo-place" class="muted">Aucun lieu de travail défini.</p>
+        <button id="geo-set" class="btn small">📍 Ma position actuelle = lieu de travail</button>
+        <div class="grid2">
+          <label>Rayon (m)<input id="geo-radius" type="number" min="30" step="10" /></label>
+          <label>Délai (min)<input id="geo-delay" type="number" min="0" step="0.5" /></label>
+        </div>
+        <p class="muted small">La version web ne suit ta position que lorsque la page est ouverte. Pour un vrai pointage en arrière-plan, utilise l’app mobile.</p>
+        <label class="switch"><input type="checkbox" id="geo-sim" /> Mode test : simuler ma présence sur le lieu de travail</label>
+        <p id="geo-debug" class="muted small mono"></p>
+      </div>
+
+      <div class="card">
+        <h2>Données</h2>
+        <div class="stack">
+          <button id="export-csv" class="btn small">Exporter en CSV (Excel)</button>
+          <button id="export-json" class="btn small">Sauvegarder (JSON)</button>
+          <label class="btn small file">Restaurer une sauvegarde<input id="import-json" type="file" accept="application/json" hidden /></label>
+          <button id="demo" class="btn small ghost">Charger des données de démo</button>
+          <button id="reset" class="btn small danger">Tout effacer</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="pointer" class="active">⏱️<span>Pointer</span></button>
+    <button data-tab="planning">🗓️<span>Planning</span></button>
+    <button data-tab="history">📅<span>Historique</span></button>
+    <button data-tab="settings">⚙️<span>Réglages</span></button>
+  </nav>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
